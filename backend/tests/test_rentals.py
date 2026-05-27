@@ -55,3 +55,15 @@ def test_return_rental_success(client):
     res = client.patch(f"/rentals/{rental_id}/return", headers={"X-User-Id": "alice"})
     assert res.status_code == 200
     assert res.json()["returned_at"] is not None
+
+
+def test_extend_rental_success(client):
+    create_res = client.post("/rentals", json={"asset_id": 1}, headers={"X-User-Id": "alice"})
+    rental_id = create_res.json()["id"]
+
+    res = client.patch(
+        f"/rentals/{rental_id}/extend",
+        json={"extra_days": 3},
+        headers={"X-User-Id": "alice"},
+    )
+    assert res.status_code == 200
