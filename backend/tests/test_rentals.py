@@ -1,4 +1,4 @@
-# 대여 기본 동작 테스트 (반납/연장은 feat/return-extend 브랜치에서 추가)
+# 대여 동작 테스트 (반납/연장 포함)
 
 
 def test_list_assets(client):
@@ -46,3 +46,12 @@ def test_list_my_rentals(client):
     body = res.json()
     assert len(body) == 1
     assert body[0]["user_id"] == "alice"
+
+
+def test_return_rental_success(client):
+    create_res = client.post("/rentals", json={"asset_id": 1}, headers={"X-User-Id": "alice"})
+    rental_id = create_res.json()["id"]
+
+    res = client.patch(f"/rentals/{rental_id}/return", headers={"X-User-Id": "alice"})
+    assert res.status_code == 200
+    assert res.json()["returned_at"] is not None
