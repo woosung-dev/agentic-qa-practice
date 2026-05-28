@@ -2,6 +2,7 @@
 import { Link, Route, Routes } from 'react-router-dom';
 import { AssetList } from './pages/AssetList';
 import { MyRentals } from './pages/MyRentals';
+import { ReturnExtend } from './pages/ReturnExtend';
 
 export function App() {
   const userId = localStorage.getItem('userId');
@@ -14,10 +15,12 @@ export function App() {
       <nav style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
         <Link to="/">장비 목록</Link>
         <Link to="/mine">내 대여</Link>
+        <Link to="/return-extend">반납/연장</Link>
       </nav>
       <Routes>
         <Route path="/" element={<AssetList />} />
         <Route path="/mine" element={<MyRentals />} />
+        <Route path="/return-extend" element={<ReturnExtend />} />
       </Routes>
     </div>
   );
