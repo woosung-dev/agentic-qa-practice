@@ -2,13 +2,24 @@
 import { useEffect, useState } from 'react';
 import { Rental, fetchMyRentals } from '../api/client';
 
+type Filter = 'all' | 'active' | 'returned';
+
 export function MyRentals() {
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Filter>('all');
 
   useEffect(() => {
     fetchMyRentals()
-      .then(setRentals)
+      .then((all) => {
+        if (filter === 'active') {
+          setRentals(all.filter((r) => r.returned_at === null));
+        } else if (filter === 'returned') {
+          setRentals(all.filter((r) => r.returned_at !== null));
+        } else {
+          setRentals(all);
+        }
+      })
       .catch((err) => setError((err as Error).message));
   }, []);
 
@@ -17,6 +28,11 @@ export function MyRentals() {
   return (
     <section>
       <h2>내 대여</h2>
+      <div style={{ marginBottom: 12, display: 'flex', gap: 8 }}>
+        <button onClick={() => setFilter('all')}>전체</button>
+        <button onClick={() => setFilter('active')}>대여 중</button>
+        <button onClick={() => setFilter('returned')}>반납 완료</button>
+      </div>
       {rentals.length === 0 ? (
         <p>대여 중인 장비가 없습니다.</p>
       ) : (
