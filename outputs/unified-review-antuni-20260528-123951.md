@@ -344,3 +344,65 @@ PR 의도(반납/연장/가용성 API + 화면)와 무관하게 자연스럽게 
 ```
 
 </details>
+
+---
+
+## Playwright 런타임 검증 (2026-05-28 추가)
+
+> 합의 리뷰는 코드 리뷰 단계에서 멈췄으나, 동일 브랜치 상태로 dev 서버(`localhost:5173` ← `localhost:8000`)를 띄우고 Playwright MCP로 4개 시나리오를 실측. 코드 리뷰에서 *라벨만 단* 항목을 *실행 증거로 승격*하고, 코드만 봐서는 못 잡는 race·검증 사각지대를 추가로 발견.
+
+### [RUN-1] "7일 연장" 버튼 실제 동작 확인 — UNPLANNED-3 승격
+- **시나리오**: HHKB 대여(due_at = 2026-06-04) → "3일 연장" 클릭 → 6/4→6/7 (정상) → "7일 연장" 클릭 → **6/7→6/10 (+3일)**, 토스트 "**3일 연장 완료**"
+- **결과**: UNPLANNED-3가 명시했던 "`handleExtend(rental.id, 3)`" 라벨/동작 불일치가 실제 화면+네트워크로 입증. PATCH body 모두 200 OK.
+- **승격**: UNPLANNED-3 → 코드 리뷰 라벨 + 런타임 증거 동시 보유.
+
+### [RUN-2] 빠른 연속 클릭 race — 신규 발견 (Blocking 후보)
+- **시나리오**: MacBook(due_at = 2026-06-04)에서 "3일 연장" 버튼을 JS 레벨에서 동기 5연속 dispatch.
+- **관찰**:
+  - `PATCH /rentals/1/extend` 5건 **모두 200 OK** (서버에서 거절 없음)
+  - 최종 due_at: **6/4 → 6/7 (+3일만 반영)** — 사용자 의도(+15일)와 13일 손실
+  - `MAX_EXTEND_DAYS=14` 한도 **우회됨** — 정상 직렬 처리였다면 3번째 클릭에서 400(extend_limit_exceeded)이 떠야 함
+- **원인 (2축 결합)**:
+  - **클라이언트**: `frontend/src/pages/ReturnExtend.tsx:40-51`의 `handleExtend`에 inflight/disable 가드 없음. 같은 PATCH가 0초 간격으로 N발 발사됨.
+  - **서버**: `backend/app/routers/rentals.py:88-101`의 read-modify-write가 락 없이 수행됨. 동시 요청들이 모두 동일 baseline `rental.due_at`을 읽어 같은 값으로 commit. 낙관적 락(`UPDATE … WHERE due_at = ?`) 또는 `SELECT FOR UPDATE` 부재.
+- **체인 의미**: 트랩 #14(음수 우회)와 결합 시 — 한 사용자가 "쇼핑 카트" 식으로 빠르게 -100 / +100 / -100 클릭 → 서버 race로 임의 시점의 due_at으로 합법화 가능.
+- **권고**: (FE) 버튼에 inflight state `disabled`. (BE) `Rental.due_at`에 낙관적 락 컬럼 또는 `version` 추가, 또는 SQLite `BEGIN IMMEDIATE` + 행 단위 lock.
+- **차단 여부**: **Blocking** — 동시성 가드는 별도 PR로 분리 가능하지만, 14일 한도 우회는 도메인 룰 직접 위반.
+
+### [RUN-3] 모든 대여 반납 후 빈 상태 안내 — 트랩 #15 발견 확정
+- **시나리오**: 활성 대여 2건 전부 반납 → `/return-extend` 화면 관찰
+- **관찰**: `<ul>`은 비어있지만 "활성 대여가 없습니다" 안내문 **미표시**. 사용자는 항목이 사라진 이유를 모름.
+- **원인**: `ReturnExtend.tsx:57` — `{rentals.length === 0 && <p>활성 대여가 없습니다.</p>}`. `rentals`에는 반납 완료 건도 들어있어 `length>0` → 빈 상태 분기 미진입.
+- **수정**: `{rentals.filter(r => r.returned_at === null).length === 0 && ...}`로 활성 기준으로 판정.
+- **차단 여부**: Non-blocking (기능 동작은 정상, UX 결함).
+
+### [RUN-4] `MyRentals` 필터 useEffect 런타임 입증 — UNPLANNED-2 승격
+- **시나리오**: 반납 완료 2건 상태에서 `/mine` → "대여 중" 필터 클릭
+- **관찰**: 표가 그대로 (반납 완료 2건 유지). "대여 중인 장비가 없습니다" 분기 미진입.
+- **원인**: `MyRentals.tsx:24`의 `useEffect` 의존성 `[]` 라 필터 state 변경 시 재실행 안 됨.
+- **수정**: 의존성에 `[filter]` 추가 또는 fetch 1회 + 렌더에서 filter 적용.
+
+### [RUN-5] `PATCH /rentals/{id}/extend` 비정상 값 — 트랩 #14 강화
+- **시나리오**: `fetch`로 다양한 `extra_days` 값 직접 전송 (asset 3, started=5/28, due=6/4):
+
+| extra_days | status | 결과 due_at | 평가 |
+|---|---|---|---|
+| -3 | **200** | 2026-06-01 | 반납 예정이 과거로 *당겨짐* |
+| -365 | **200** | **2025-06-01** | **`started_at`(2026-05-28)보다 이전** — 도메인 불변식 위반 |
+| 0 | 200 | 변화 없음 | noop인데 "0일 연장 완료" 토스트로 사용자 혼란 |
+| 9999 | 400 `extend_limit_exceeded` | — | 정상 |
+| 3.7 / "abc" / null | 422 | — | Pydantic이 정상 차단 |
+
+- **확정**: 트랩 #14가 명시한 "음수 due_at 과거"를 *실측*. 추가로 *시작일보다 이전*까지 가는 극단 케이스 입증.
+- **수정**: `Field(ge=1, le=14)` 또는 Service에서 `due_at_after_extend > started_at` 불변식 검증.
+
+### Playwright 검증 요약
+| 시나리오 | 결과 | 연결 트랩/UNPLANNED |
+|---|---|---|
+| RUN-1 7일 연장 버튼 | 라벨 vs 동작 불일치 확정 (+3일만) | UNPLANNED-3 / 트랩 #13 |
+| RUN-2 빠른 연속 클릭 | 5클릭 → +3일만 반영, MAX 우회 | **신규 발견** (FE inflight + BE race) |
+| RUN-3 빈 상태 안내 | 미표시 확정 | **트랩 #15 (이전 미발견)** |
+| RUN-4 MyRentals 필터 | 클릭해도 갱신 안 됨 | UNPLANNED-2 / 트랩 #4 |
+| RUN-5 extend 음수/0 | -3, -365, 0 모두 200 OK | 트랩 #14 강화 |
+
+**한 줄 갱신**: 코드 리뷰가 잡지 못한 빈 상태 메시지(#15)와 동시성 race 두 건이 런타임에서 추가되었고, 음수 검증 우회는 *시작일 이전 due_at*이라는 극단 케이스까지 입증됨.
