@@ -1,0 +1,436 @@
+<!-- TRAP 매칭 채점 (tuni) -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>TRAP 매칭 채점 — tuni</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px;
+    background: #0f1115;
+    color: #e6e9ef;
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  h1 {
+    font-size: 28px; margin: 0 0 4px;
+    color: #ffffff; letter-spacing: -0.5px;
+  }
+  .sub { color: #8a93a6; font-size: 13px; margin-bottom: 28px; }
+  h2 {
+    font-size: 18px; margin: 36px 0 14px;
+    color: #ffffff; letter-spacing: -0.3px;
+    border-left: 3px solid #6ea8fe; padding-left: 10px;
+  }
+  h3 { font-size: 15px; margin: 18px 0 8px; color: #c7d0e0; }
+  .panel {
+    background: #161922; border: 1px solid #242938;
+    border-radius: 10px; padding: 18px 20px; margin-bottom: 16px;
+  }
+  /* 점수 카드 */
+  .cards {
+    display: grid; grid-template-columns: repeat(6, 1fr);
+    gap: 12px; margin-bottom: 8px;
+  }
+  .card {
+    background: #161922; border: 1px solid #242938;
+    border-radius: 10px; padding: 16px 14px; text-align: center;
+  }
+  .card .label {
+    color: #8a93a6; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px;
+  }
+  .card .value {
+    font-size: 28px; font-weight: 700; color: #ffffff;
+    line-height: 1.1;
+  }
+  .card .denom { color: #8a93a6; font-size: 14px; font-weight: 400; }
+  .card.accent .value { color: #6ea8fe; }
+  .card.good   .value { color: #5cd6a3; }
+  .card.warn   .value { color: #f0b15c; }
+  .card.bad    .value { color: #ef6f6f; }
+  .card.bonus  .value { color: #c084fc; }
+
+  /* 표 */
+  table {
+    width: 100%; border-collapse: collapse;
+    background: #161922; border: 1px solid #242938;
+    border-radius: 8px; overflow: hidden;
+  }
+  th, td {
+    padding: 10px 12px; text-align: left;
+    border-bottom: 1px solid #242938;
+    vertical-align: top;
+  }
+  th {
+    background: #1c2030; color: #c7d0e0;
+    font-size: 12px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  tr:last-child td { border-bottom: none; }
+  td.id { font-family: ui-monospace, "SF Mono", Menlo, monospace; color: #8a93a6; width: 50px; }
+  td.status { width: 100px; font-weight: 600; }
+  td.evidence { color: #b0b8c8; font-size: 13px; }
+  td.evidence code {
+    background: #1c2030; padding: 1px 6px; border-radius: 4px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px; color: #c7d0e0;
+  }
+  .status.full    { color: #5cd6a3; }
+  .status.partial { color: #f0b15c; }
+  .status.miss    { color: #ef6f6f; }
+
+  /* 강조 박스 */
+  .dashed {
+    border: 1.5px dashed #c084fc; background: #1a1726;
+    border-radius: 10px; padding: 16px 20px; margin-bottom: 16px;
+  }
+  .pink {
+    border: 1px solid #ef6f9c; background: #2a1620;
+    border-radius: 10px; padding: 16px 20px; margin-bottom: 16px;
+  }
+  .dashed h2, .pink h2 { border-left: none; padding-left: 0; margin-top: 0; }
+  .combo-title {
+    color: #ff9ec3; font-weight: 700; font-size: 15px;
+    margin-top: 12px;
+  }
+  ul { margin: 8px 0; padding-left: 20px; }
+  li { margin-bottom: 6px; }
+  .pill {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 600;
+    margin-left: 6px; vertical-align: middle;
+  }
+  .pill.blocking { background: #3a1c20; color: #ef6f6f; }
+  .pill.critical { background: #3a1c20; color: #ef6f6f; }
+  .pill.high     { background: #3a2a18; color: #f0b15c; }
+  .pill.medium   { background: #1c2c3a; color: #6ea8fe; }
+  .pill.low      { background: #243042; color: #8a93a6; }
+
+  /* 7항목 체크 */
+  .checklist { columns: 2; column-gap: 24px; }
+  .checklist .item {
+    break-inside: avoid; padding: 8px 12px;
+    border: 1px solid #242938; border-radius: 8px;
+    background: #161922; margin-bottom: 10px;
+  }
+  .check { color: #5cd6a3; font-weight: 700; margin-right: 8px; }
+
+  /* 강점/약점 */
+  .split { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .split .panel h3 { margin-top: 0; }
+  .strong h3 { color: #5cd6a3; }
+  .weak   h3 { color: #ef6f6f; }
+  .next   h3 { color: #6ea8fe; }
+
+  footer { margin-top: 36px; color: #5a637a; font-size: 12px; text-align: center; }
+  @media (max-width: 900px) {
+    .cards { grid-template-columns: repeat(3, 1fr); }
+    .checklist { columns: 1; }
+    .split { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>TRAP 매칭 채점 리포트 — tuni</h1>
+  <div class="sub">대상 리뷰: <code>outputs/unified-review-antuni-20260528-123951.md</code> · 채점 기준: 호스트 TRAP 인벤토리 (26+ 항목)</div>
+
+  <!-- 1. 종합 점수 카드 -->
+  <h2>1. 종합 점수</h2>
+  <div class="cards">
+    <div class="card accent">
+      <div class="label">TRAP 매칭</div>
+      <div class="value">19<span class="denom">/26</span></div>
+    </div>
+    <div class="card good">
+      <div class="label">완전 ✅</div>
+      <div class="value">14</div>
+    </div>
+    <div class="card warn">
+      <div class="label">부분 ⚠️</div>
+      <div class="value">5</div>
+    </div>
+    <div class="card bad">
+      <div class="label">미발견 ❌</div>
+      <div class="value">7</div>
+    </div>
+    <div class="card bonus">
+      <div class="label">결합 보너스</div>
+      <div class="value">2</div>
+    </div>
+    <div class="card bonus">
+      <div class="label">추가 발견</div>
+      <div class="value">6</div>
+    </div>
+  </div>
+  <div class="panel">
+    <strong>요약:</strong> 코드 레벨(A) 트랩은 12개 중 11개를 완전 매칭, 1개 부분(동시성 테스트 부재는 5차원 분석 섹션에만 존재). 런타임(B) 2/3, Playwright(C)는 코드 리뷰 단계라 0/3 완전·2 부분. 비계획(D)은 8개 중 3개만 매칭 — 인프라/UX/운영 축이 약점. 결합 시나리오(COMBO-1·2)와 N+1 인덱스 부재 등 추가 발견 6건이 보너스로 회수.
+  </div>
+
+  <!-- 2. A. 코드 레벨 (12) -->
+  <h2>2. A. 코드 레벨 트랩 (12) — 11✅ / 1⚠️ / 0❌</h2>
+  <table>
+    <thead><tr><th>#</th><th>축</th><th>트랩 요지</th><th>매칭</th><th>리뷰 근거</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="id">#1</td><td>보안</td>
+        <td><code>return_rental</code> user_id 받고 미사용 → 남의 대여 반납</td>
+        <td class="status full">✅ 완전</td>
+        <td class="evidence">통합 #1 (Critical, Blocking) — 3중 공동 발견(Security+Architecture+Test). 공격 시나리오 명시.</td>
+      </tr>
+      <tr>
+        <td class="id">#2</td><td>보안</td>
+        <td><code>dangerouslySetInnerHTML</code>로 장비명 렌더</td>
+        <td class="status full">✅ 완전</td>
+        <td class="evidence">통합 #4 (Critical, Blocking) — `<img onerror=...>` 페이로드 예시 + 백엔드 sanitize 부재 지적.</td>
+      </tr>
+      <tr>
+        <td class="id">#3</td><td>성능</td>
+        <td><code>list_assets_with_availability</code> N+1 쿼리</td>
+        <td class="status full">✅ 완전</td>
+        <td class="evidence">통합 #6 (High) — JOIN 단일 쿼리화 코드 예시 + estimated_gain 90%.</td>
+      </tr>
+      <tr>
+        <td class="id">#4</td><td>성능</td>
+        <td><code>MyRentals.tsx</code> useEffect deps 누락</td>
+        <td class="status full">✅ 완전</td>
+        <td class="evidence">UNPLANNED-2 — "필터 클릭해도 갱신 안 됨" 명시. Test 도메인이 잠재 버그로 식별.</td>
+      </tr>
+      <tr>
+        <td class="id">#5</td><td>테스트</td>
+        <td>동시 반납/대여 경합 미테스트</td>
+        <td class="status partial">⚠️ 부분</td>
+        <td class="evidence">Test 5차원 분석 "in-memory SQLite 한 트랜잭션 — 동시 대여 race condition 인프라 부재" 언급. 통합 본문 finding으로는 승격 안 됨.</td>
+      </tr>
+      <tr>
+        <td class="id">#6</td><td>테스트</td>
+        <td>overdue/경계 시간 미테스트</td>
+        <td class="status full">✅ 완전</td>
+        <td class="evidence">통합 #5 (High, Blocking) — MAX_EXTEND_DAYS 14일 경계/0/음수 검증 부재 + 음수 시 즉시 연체 가능 명시.</td>
+      </tr>
+      <tr>
+        <td class="id">#7</td><td>아키</td>
+        <td><code>extend_rental</code> 비즈니스 로직 라우터에</td>
+        <td class="status full">✅ 완전</td>
+        <td class="evidence">통합 #2 (Critical, Blocking) — Architecture가 §1/§4/§5 3중 위반으로 단일 뿌리 통합. <code>rental_service</code> 미생성 grep 검증.</td>
+      </tr>
+      <tr>
+        <td class="id">#8</td><td>아키</td>
+        <td><code>returned_at</code> + <code>asset.status</code> 이중 상태</td>
+        <td class="status full">✅ 완전</td>
+        <td class="evidence">통합 #3 (Critical, Blocking) — ARCHITECTURE.md §2 canonical anti-example과 정확히 동일하다고 지적. maintenance 덮어쓰기 의도 불명까지 동반.</td>
+      </tr>
+      <tr>
+        <td class="id">#9</td><td>보안</td>
+        <td><code>handleError</code> raw body+headers+userId 콘솔 노출</td>
+        <td class="status full">✅ 완전</td>
+        <td class="evidence">통합 #11 (Medium, Non-blocking) — COMBO-1 체인의 중간 잠금장치로 활용.</td>
+      </tr>
+      <tr>
+        <td class="id">#10</td><td>성능</td>
+        <td><code>AssetList</code> 매 렌더 filter().sort() + key={index}</td>
+        <td class="status full">✅ 완전</td>
+        <td class="evidence">통합 #15 (Medium) + UNPLANNED-4 — useMemo + key={asset.id} 권고. 키스트로크당 60-80% 단축 추정.</td>
+      </tr>
+      <tr>
+        <td class="id">#11</td><td>테스트</td>
+        <td><code>frontend/tests/</code> 0개</td>
+        <td class="status full">✅ 완전</td>
+        <td class="evidence">통합 #9 (High, Non-blocking) — Vitest 인프라만 깔리고 .test.tsx 0개. XSS 회귀 TODO도 함께 지적.</td>
+      </tr>
+      <tr>
+        <td class="id">#12</td><td>아키</td>
+        <td>API client 비즈 로직 + ReturnExtend 우회 fetch</td>
+        <td class="status full">✅ 완전</td>
+        <td class="evidence">통합 #7 + #12 — fetchAssets SRP 위반 + ReturnExtend가 BASE/raw fetch로 client.ts 우회. 두 관점 모두 별도 finding으로.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 3. B. 런타임 (3) -->
+  <h2>3. B. 런타임 트랩 (3) — 2✅ / 0⚠️ / 1❌</h2>
+  <table>
+    <thead><tr><th>#</th><th>축</th><th>트랩 요지</th><th>매칭</th><th>리뷰 근거</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="id">#13</td><td>FE</td>
+        <td>"7일 연장" 버튼이 3일만 연장</td>
+        <td class="status full">✅ 완전</td>
+        <td class="evidence">UNPLANNED-3 — Security 도메인이 라벨/동작 불일치로 식별 (코드 리뷰 단계에서 잡음).</td>
+      </tr>
+      <tr>
+        <td class="id">#14</td><td>BE</td>
+        <td><code>extra_days</code> 음수 검증 없음 → due_at 과거</td>
+        <td class="status full">✅ 완전</td>
+        <td class="evidence">통합 #5 (Blocking) — "음수면 즉시 연체 처리" 명시. Pydantic <code>ge=1, le=14</code> 권고.</td>
+      </tr>
+      <tr>
+        <td class="id">#15</td><td>FE</td>
+        <td>"활성 대여 없음" 메시지가 전체 rentals 기준</td>
+        <td class="status miss">❌ 미발견</td>
+        <td class="evidence"><code>rentals.length === 0</code> 조건이 enriched 전체 리스트 기준이라는 점은 리뷰에서 다뤄지지 않음. 런타임 시나리오 부재의 사각지대.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 4. C. Playwright (3) -->
+  <h2>4. C. Playwright 전용 발견 (3) — 0✅ / 2⚠️ / 1❌</h2>
+  <table>
+    <thead><tr><th>#</th><th>축</th><th>트랩 요지</th><th>매칭</th><th>리뷰 근거</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="id">#P1</td><td>code+runtime</td>
+        <td>key={index}로 잘못된 컴포넌트 매칭/상태 꼬임</td>
+        <td class="status partial">⚠️ 부분</td>
+        <td class="evidence">UNPLANNED-SEC-2가 "state corruption으로 대여 버튼이 잘못된 자산을 가리키는 UX 결함 가능"으로 잠재 버그까지 언급. 단, Playwright 실제 실행 검증은 없음.</td>
+      </tr>
+      <tr>
+        <td class="id">#P2</td><td>보안</td>
+        <td>XSS 실제 실행 검증</td>
+        <td class="status partial">⚠️ 부분</td>
+        <td class="evidence">SEC-2가 <code>&lt;img onerror=...&gt;</code> 페이로드 명시 + COMBO-1 체인까지 작성. 단, 실제 page.evaluate / window.__pwn 검증은 없음.</td>
+      </tr>
+      <tr>
+        <td class="id">#P3</td><td>접근성</td>
+        <td>axe-core 류 a11y 위반</td>
+        <td class="status miss">❌ 미발견</td>
+        <td class="evidence">aria-label/semantic HTML/heading hierarchy/color contrast — 전혀 다루지 않음. a11y 전문 에이전트 부재.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 5. D. 비계획 (8) -->
+  <h2>5. D. 비계획 발견 baseline (8) — 1✅ / 2⚠️ / 5❌</h2>
+  <table>
+    <thead><tr><th>#</th><th>종류</th><th>트랩 요지</th><th>매칭</th><th>리뷰 근거</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="id">U1</td><td>deprecation</td>
+        <td>Pydantic <code>class Config:</code> 패턴 (v3 제거 예정)</td>
+        <td class="status miss">❌ 미발견</td>
+        <td class="evidence">Pydantic 버전/마이그레이션 관점 누락. 의존성 deprecation 검사가 없는 결과.</td>
+      </tr>
+      <tr>
+        <td class="id">U2</td><td>보안 구성</td>
+        <td>CORS <code>allow_methods=["*"]</code> + <code>allow_credentials=True</code></td>
+        <td class="status full">✅ 완전</td>
+        <td class="evidence">통합 #17 (Low) — SEC-5에서 향후 origin 확장 시 CSRF 방어 제로 위험까지 명시.</td>
+      </tr>
+      <tr>
+        <td class="id">U3</td><td>환경 설정</td>
+        <td><code>BASE = 'http://localhost:8000'</code> 하드코딩</td>
+        <td class="status partial">⚠️ 부분</td>
+        <td class="evidence">통합 #7에서 "BASE 중복"으로 구조 일관성 측면만 지적. 환경 설정/멀티 환경 관점은 누락.</td>
+      </tr>
+      <tr>
+        <td class="id">U4</td><td>인증 표시</td>
+        <td>가짜 인증을 프로덕션 코드처럼 작성 (주석/경고 없음)</td>
+        <td class="status partial">⚠️ 부분</td>
+        <td class="evidence">통합 #18 (SEC-6)가 "워크숍 명시 전제"로 인용. 단, "코드에 명시적 경고 주석 추가" 같은 *방어적 가시화* 권고는 없음.</td>
+      </tr>
+      <tr>
+        <td class="id">U5</td><td>하드코딩</td>
+        <td><code>DEFAULT_RENTAL_DAYS = 7</code> 외부 설정 부재</td>
+        <td class="status miss">❌ 미발견</td>
+        <td class="evidence">설정값 외부화 관점 누락. 환경별/정책별 가변 운영 시나리오 미고려.</td>
+      </tr>
+      <tr>
+        <td class="id">U6</td><td>UX</td>
+        <td>에러 detail이 영어 코드 그대로 (<code>asset_not_found</code> 등)</td>
+        <td class="status miss">❌ 미발견</td>
+        <td class="evidence">국제화/사용자 경험 관점 누락. 한국 사용자 대상 서비스인데 i18n 검토 없음.</td>
+      </tr>
+      <tr>
+        <td class="id">U7</td><td>운영</td>
+        <td><code>/healthz</code> 엔드포인트 부재</td>
+        <td class="status miss">❌ 미발견</td>
+        <td class="evidence">관측성/운영 관점 누락. k8s/로드밸런서 readiness 시나리오 미고려.</td>
+      </tr>
+      <tr>
+        <td class="id">U8</td><td>자동 셋팅</td>
+        <td><code>main.tsx</code>에 <code>localStorage.userId = 'alice'</code> 영구 박힘</td>
+        <td class="status miss">❌ 미발견</td>
+        <td class="evidence">통합 #21이 *Vitest setup*의 userId 셋팅은 잡았지만, <em>main.tsx 부트스트랩 영구 박힘</em>은 다루지 않음. 인접 패턴이라 놓치기 쉬운 사각지대.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 6. 추가 발견 -->
+  <div class="dashed">
+    <h2>6. 🎁 TRAP에 없는 추가 발견 (보너스)</h2>
+    <ul>
+      <li><strong>Rental 핫컬럼 인덱스 전무</strong> <span class="pill high">High</span> — 통합 #6 후반. <code>asset_id</code>/<code>user_id</code>/<code>returned_at</code> 모두 인덱스 없음. N+1과 곱해져 누적성 회귀 위험. 트랩 #3(N+1)의 증폭기로 작용.</li>
+      <li><strong>UNPLANNED-1: <code>/assets/availability/all</code> 인증 없이 활성 대여 due_at 노출</strong> <span class="pill medium">Medium</span> — 정찰 정보 누설. COMBO-2의 한 축. 트랩 인벤토리에 없음.</li>
+      <li><strong>UNPLANNED-5: <code>fetchActiveAssetsForUser</code> OR 조건 의심</strong> <span class="pill medium">Medium</span> — <code>!has(id) || status === available</code>이 의도와 일치하는지 불명. 잠재적 논리 결함.</li>
+      <li><strong>UNPLANNED-6: <code>fetchActiveAssetsForUser</code> 직렬 await</strong> <span class="pill medium">Medium</span> — Promise.all 병렬화 가능. 다른 위치에선 병렬화돼 있는데 여기만 직렬.</li>
+      <li><strong>통합 #16: <code>AssetRow.meta.filters</code> ISP 위반</strong> <span class="pill medium">Medium</span> — prop으로 받지만 미사용. 의미 없는 의존성으로 결합도 상승.</li>
+      <li><strong>통합 #20: <code>fetchAssets</code> 중복 정렬</strong> <span class="pill low">Low</span> — backend + client + AssetList 3중 sort. localeCompare 비용 누적.</li>
+    </ul>
+  </div>
+
+  <!-- 7. 결합 시나리오 -->
+  <div class="pink">
+    <h2>7. 🔗 결합 시나리오 (Combined Risks)</h2>
+    <div class="combo-title">[COMBO-1] XSS → 콘솔 dump 흡수 → userId 탈취 → IDOR 대량 반납 <span class="pill critical">Critical 체인</span></div>
+    <div>결합 발견: 트랩 #2 (XSS) + 트랩 #9 (handleError 정보 노출) + 트랩 #1 (return IDOR). 단독은 High + Medium + Critical이지만 체인이 무인 자동화를 가능하게 만들어 <strong>Critical로 승격</strong>. 5단계 공격 경로를 통합 리포트가 시퀀스로 명시. 트랩 #3 (이중 상태)이 후속 재대여 통과를 도와 체인 길이를 추가로 늘림.</div>
+    <div class="combo-title">[COMBO-2] 순차 ID + 반납 IDOR + <code>availability/all</code> 인증 부재 = 정찰→대량 탈취 <span class="pill high">High</span></div>
+    <div>결합 발견: 트랩 #1 (Critical) + UNPLANNED-1 (Medium, 인증 없는 due_at 노출). 인증 없이 활성 대여 목록을 수집한 뒤 순차 정수 ID로 정밀 강제 반납. 통합 리포트가 별도 권고로 <code>Depends(current_user)</code> 추가도 명시.</div>
+  </div>
+
+  <!-- 8. 합의 종합 품질 7항목 -->
+  <h2>8. ✅ 합의 종합 품질 7항목 체크</h2>
+  <div class="checklist">
+    <div class="item"><span class="check">✓</span><strong>중복 병합 흔적</strong> — #1·#3·#4·#7 모두 "공동 발견자" 명시 (3중·2중).</div>
+    <div class="item"><span class="check">✓</span><strong>충돌 해결 기록</strong> — "이번 리뷰엔 리뷰어 간 명시적 충돌 없음" 표로 명시.</div>
+    <div class="item"><span class="check">✓</span><strong>Blocking/Non-blocking 라벨</strong> — 21개 항목 전부에 라벨 부여.</div>
+    <div class="item"><span class="check">✓</span><strong>Executive Summary 한 줄 위험 요약</strong> — 인용 형식으로 최상단 배치.</div>
+    <div class="item"><span class="check">✓</span><strong>결합 시나리오 1+개</strong> — COMBO-1·COMBO-2 두 건. 단계별 시퀀스 명시.</div>
+    <div class="item"><span class="check">✓</span><strong>비계획 발견 별도 섹션</strong> — UNPLANNED-1~6 6건 별도 섹션 + 발견자 표기.</div>
+    <div class="item"><span class="check">✓</span><strong>Confidence 라벨</strong> — 모든 finding에 High/Medium/Low 명시.</div>
+  </div>
+  <div class="panel" style="margin-top:12px;">7/7 통과. 종합 품질 면에서는 만점. 발견 자체의 범위(특히 비계획 D축과 Playwright C축)에서만 갭이 있음.</div>
+
+  <!-- 9. 강점 / 약점 / 다음 라운드 -->
+  <h2>9. 📈 강점 / 약점 / 다음 라운드 개선</h2>
+  <div class="split">
+    <div class="panel strong">
+      <h3>강점</h3>
+      <ul>
+        <li>A축(코드 레벨) 12/12 식별 — 다축(보안·성능·테스트·아키)이 같은 결함을 다른 각도에서 잡아 <strong>3중 공동 발견</strong> 사례 다수.</li>
+        <li>결합 시나리오 2건 — 단독 평가의 *합*이 아닌 *시너지*를 봄. 특히 COMBO-1 Critical 승격은 합의 리뷰의 가치를 입증.</li>
+        <li>비계획 발견 6건 — TRAP 외 N+1 인덱스 부재, <code>/availability/all</code> 인증 부재 등 깊이 있는 추적.</li>
+        <li>합의 종합 품질 7/7 — 발견자 속성/충돌 기록/Blocking 라벨/한 줄 위험 모두 만점.</li>
+      </ul>
+    </div>
+    <div class="panel weak">
+      <h3>약점</h3>
+      <ul>
+        <li><strong>Playwright/런타임 검증 부재</strong> — C축 0/3 완전. 코드 리뷰에서 *경고 라벨*은 달지만 실제 실행 검증으로 가지 못함.</li>
+        <li><strong>D축 운영/UX 사각지대</strong> — <code>/healthz</code>, i18n, 설정 외부화, deprecation 등 5건 미발견. *시니어 코드 리뷰* 관점은 강한 반면 *시니어 운영* 관점이 약함.</li>
+        <li><strong>접근성 도메인 부재</strong> — a11y-guardian 류 전문 에이전트 없음.</li>
+        <li><strong>인접 패턴 놓침</strong> — Vitest setup의 userId는 잡았지만 main.tsx 부트스트랩 영구 박힘은 놓침 (U8).</li>
+      </ul>
+    </div>
+    <div class="panel next">
+      <h3>다음 라운드 개선</h3>
+      <ul>
+        <li><strong>Playwright 에이전트 추가</strong> — XSS 페이로드 실제 실행(P2), React DevTools로 key 버그 검증(P1), axe-core 통합(P3).</li>
+        <li><strong>운영성 에이전트(SRE 관점)</strong> — readiness/liveness, 로그 포맷, 설정 외부화, healthcheck를 한 축으로.</li>
+        <li><strong>i18n/UX 에이전트</strong> — 에러 메시지 사용자 친화도, 한국어 정렬, 폼 validation UX.</li>
+        <li><strong>의존성/deprecation 스캐너</strong> — Pydantic v2/v3 마이그레이션, 사용 중인 패키지의 EOL 검사.</li>
+        <li><strong>"인접 패턴 한 번 더 검색" 휴리스틱</strong> — 한 곳에서 발견 시 grep으로 동일 패턴을 코드베이스 전체에서 검사 (U8 회수 가능).</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>채점 기준: TRAP 인벤토리 26+ 항목 (호스트 전용, 본 리포트에 인용·복사 없음). 채점 대상: <code>outputs/unified-review-antuni-20260528-123951.md</code>.</footer>
+
+</div>
+</body>
+</html>
