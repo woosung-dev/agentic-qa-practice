@@ -1,0 +1,561 @@
+<!-- TRAP 매칭 채점 (handevmin) -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>TRAP 매칭 채점 — handevmin</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px;
+    background: #0f1115;
+    color: #e6e9ef;
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    line-height: 1.55;
+    font-size: 14px;
+  }
+  h1 {
+    margin: 0 0 4px;
+    font-size: 26px;
+    color: #ffffff;
+    font-weight: 700;
+  }
+  h2 {
+    margin: 32px 0 12px;
+    font-size: 19px;
+    color: #6ea8fe;
+    border-bottom: 1px solid #2a2f3a;
+    padding-bottom: 6px;
+  }
+  h3 {
+    margin: 20px 0 8px;
+    font-size: 15px;
+    color: #e6e9ef;
+  }
+  .sub {
+    color: #8a93a4;
+    margin-bottom: 24px;
+    font-size: 13px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: #161922;
+    border: 1px solid #232732;
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .card .label {
+    font-size: 11px;
+    color: #8a93a4;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .card .value {
+    font-size: 26px;
+    font-weight: 700;
+    color: #ffffff;
+  }
+  .card .value.accent { color: #6ea8fe; }
+  .card .value.good   { color: #4ade80; }
+  .card .value.warn   { color: #fbbf24; }
+  .card .value.bad    { color: #f87171; }
+  .card .value.extra  { color: #c084fc; }
+  .card .hint {
+    font-size: 11px;
+    color: #8a93a4;
+    margin-top: 4px;
+  }
+  .panel {
+    background: #161922;
+    border: 1px solid #232732;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    font-size: 13px;
+  }
+  th {
+    text-align: left;
+    padding: 10px 12px;
+    background: #1a1e29;
+    color: #8a93a4;
+    font-weight: 600;
+    border-bottom: 1px solid #2a2f3a;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #1d2029;
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge.full   { background: #14532d; color: #4ade80; }
+  .badge.part   { background: #5c3d11; color: #fbbf24; }
+  .badge.miss   { background: #4d1414; color: #f87171; }
+  .axis {
+    display: inline-block;
+    font-size: 11px;
+    color: #8a93a4;
+    background: #1d2029;
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+  code, .ref {
+    font-family: "JetBrains Mono", Consolas, Monaco, monospace;
+    font-size: 12px;
+    color: #fbbf24;
+    background: #1a1e29;
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  .dashed {
+    border: 1.5px dashed #c084fc;
+    background: rgba(192, 132, 252, 0.05);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  .pink {
+    border: 1.5px solid #f472b6;
+    background: rgba(244, 114, 182, 0.07);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  ul { margin: 6px 0; padding-left: 20px; }
+  li { margin: 4px 0; }
+  .check {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 0;
+  }
+  .check .mark {
+    color: #4ade80;
+    font-weight: 700;
+    flex-shrink: 0;
+    width: 18px;
+  }
+  .check .mark.x { color: #f87171; }
+  .summary-line {
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 600;
+    margin: 14px 0;
+  }
+  .summary-line .accent { color: #6ea8fe; }
+  .footer {
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid #2a2f3a;
+    color: #8a93a4;
+    font-size: 12px;
+  }
+  .row-summary {
+    background: #1a1e29;
+    color: #6ea8fe;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<h1>TRAP 매칭 채점 — handevmin</h1>
+<div class="sub">
+  합의 리뷰 리포트 <code>outputs/unified-review-handevmin-20260528-001.md</code> ↔ 호스트 채점표 1:1 대조.
+  매칭 기준: <span class="badge full">✅완전</span> 위치+원인+수정안 일치 / <span class="badge part">⚠️부분</span> 일부만 언급 / <span class="badge miss">❌미발견</span> 흔적 없음.
+</div>
+
+<!-- 1. 종합 점수 카드 -->
+<h2>1. 종합 점수</h2>
+<div class="grid">
+  <div class="card">
+    <div class="label">TRAP 매칭 (완전+부분)</div>
+    <div class="value accent">17 / 26</div>
+    <div class="hint">완전 12 + 부분 5</div>
+  </div>
+  <div class="card">
+    <div class="label">✅ 완전 매칭</div>
+    <div class="value good">12</div>
+    <div class="hint">위치+원인+수정안 모두 일치</div>
+  </div>
+  <div class="card">
+    <div class="label">⚠️ 부분 매칭</div>
+    <div class="value warn">5</div>
+    <div class="hint">일부 측면만 잡음</div>
+  </div>
+  <div class="card">
+    <div class="label">❌ 미발견</div>
+    <div class="value bad">9</div>
+    <div class="hint">합의 리포트에 흔적 없음</div>
+  </div>
+  <div class="card">
+    <div class="label">🔗 결합 시나리오 보너스</div>
+    <div class="value extra">+5</div>
+    <div class="hint">COMBO-1 ~ COMBO-5</div>
+  </div>
+  <div class="card">
+    <div class="label">🎁 추가 발견 보너스</div>
+    <div class="value extra">+8</div>
+    <div class="hint">TRAP에 없는 자연 발견</div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="summary-line">카테고리별: <span class="accent">A 11/12 · B 2/3 · C 1/3 · D 3/8</span></div>
+  <div style="color: #8a93a4; font-size: 13px;">
+    핵심 강점은 코드 레벨(A)과 *결합 시나리오*. 약한 축은 Playwright 실행 검증(C)과 비계획 baseline(D) — 특히 운영/구성 영역 (CORS, /healthz, 가짜 인증 표시).
+  </div>
+</div>
+
+<!-- 2. A. 코드 레벨(12) -->
+<h2>2. A. 코드 레벨 트랩 (12) — 매칭 표</h2>
+<div class="panel">
+<table>
+  <thead>
+    <tr>
+      <th style="width:40px;">#</th>
+      <th style="width:60px;">축</th>
+      <th>트랩 요약</th>
+      <th style="width:80px;">매칭</th>
+      <th>내 리포트 대응</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td><td><span class="axis">보안</span></td>
+      <td><code>return_rental</code> 권한 누락 — 남의 대여 반납 가능.</td>
+      <td><span class="badge full">✅완전</span></td>
+      <td>본문 #1 (SEC-1 + ARCH-3 + TEST-1, <b>3리뷰어 독립 발견</b>). 권한 한 줄 + Service 추출 + 회귀 테스트까지 동시 제시.</td>
+    </tr>
+    <tr>
+      <td>2</td><td><span class="axis">보안</span></td>
+      <td><code>dangerouslySetInnerHTML</code>로 장비명 렌더 (Stored XSS 게이트).</td>
+      <td><span class="badge full">✅완전</span></td>
+      <td>본문 #4 (SEC-4). AssetList와 비대칭 지적 + COMBO-1에서 userId 탈취 결합 시나리오 명시.</td>
+    </tr>
+    <tr>
+      <td>3</td><td><span class="axis">성능</span></td>
+      <td><code>list_assets_with_availability</code> N+1.</td>
+      <td><span class="badge full">✅완전</span></td>
+      <td>본문 #8 (PERF-1 + ARCH-8). 인덱스 부재까지 추적 + 자산 200개 시 60ms 정량 추정.</td>
+    </tr>
+    <tr>
+      <td>4</td><td><span class="axis">성능</span></td>
+      <td>MyRentals <code>useEffect</code> deps 빈 배열 — 필터 버튼 안 먹음.</td>
+      <td><span class="badge full">✅완전</span></td>
+      <td>UNPLANNED-7 (PERF UNPLANNED-PERF-3). "필터 변경 미반영 → 새로고침 유발" 정확히 지적.</td>
+    </tr>
+    <tr>
+      <td>5</td><td><span class="axis">테스트</span></td>
+      <td>동시 반납/대여 경합 *테스트* 부재.</td>
+      <td><span class="badge part">⚠️부분</span></td>
+      <td>동시성 락 부재 자체는 #15 + COMBO-2/COMBO-4로 깊게 다룸. 그러나 "<i>동시성 테스트가 없다</i>"는 테스트 커버리지 매트릭스의 *동시성 칸 ✗*로만 표기되고 *제안 케이스 코드*가 없음.</td>
+    </tr>
+    <tr>
+      <td>6</td><td><span class="axis">테스트</span></td>
+      <td>overdue/경계 시간 *테스트* 부재.</td>
+      <td><span class="badge miss">❌미발견</span></td>
+      <td><code>MAX_EXTEND_DAYS</code> 누적 경계는 잡았으나 <i>대여 만료(overdue) 자체</i>의 시간 경계 테스트는 누락. 도메인 자체에 overdue 정책이 없어서 보이지 않음 — *역으로 정책 부재를 잡지 못함*.</td>
+    </tr>
+    <tr>
+      <td>7</td><td><span class="axis">아키</span></td>
+      <td><code>extend_rental</code> 비즈니스 로직 라우터에.</td>
+      <td><span class="badge full">✅완전</span></td>
+      <td>본문 #3 + #11 (ARCH-1 + ARCH-7 + SEC-2 + TEST-4). <code>.days</code> 절삭 off-by-one까지 추가 발견.</td>
+    </tr>
+    <tr>
+      <td>8</td><td><span class="axis">아키</span></td>
+      <td>이중 상태 (<code>returned_at</code> + <code>asset.status</code>).</td>
+      <td><span class="badge full">✅완전</span></td>
+      <td>본문 #2 (ARCH-2 + UNPLANNED-SEC-2). §2 정면 인용 + 비대칭(대여 시 미설정/반납 시 설정) + lost/maintenance silent overwrite 시나리오.</td>
+    </tr>
+    <tr>
+      <td>9</td><td><span class="axis">보안</span></td>
+      <td><code>handleError</code>에 body+headers+userId 콘솔 노출.</td>
+      <td><span class="badge full">✅완전</span></td>
+      <td>#14 + COMBO-5 (SEC-5). userId가 가짜 인증의 유일 자격증명임을 명시 + Sentry 외부 유출 경로까지.</td>
+    </tr>
+    <tr>
+      <td>10</td><td><span class="axis">성능</span></td>
+      <td>AssetList 매 렌더 filter/sort + inline 객체 + <code>key={index}</code>.</td>
+      <td><span class="badge full">✅완전</span></td>
+      <td>#16 (PERF-3). 3가지 측면 모두 + 자산 200개 시 16ms 프레임 예산 초과 추정.</td>
+    </tr>
+    <tr>
+      <td>11</td><td><span class="axis">테스트</span></td>
+      <td>frontend <code>*.test.tsx</code> 0개.</td>
+      <td><span class="badge full">✅완전</span></td>
+      <td>본문 #13 (TEST-5 + UNPLANNED-TEST-1). "npm test 통과 = 거짓 안전감" + smoke 1건 권고 + 복붙 가능한 ReturnExtend.test.tsx 제시.</td>
+    </tr>
+    <tr>
+      <td>12</td><td><span class="axis">아키</span></td>
+      <td>API client에 비즈니스 로직 + ReturnExtend 우회 fetch.</td>
+      <td><span class="badge part">⚠️부분</span></td>
+      <td>두 측면 모두 *별도 발견*은 함 — UNPLANNED-16(client 가용성 재계산), PERF-2 메모(BASE 재선언/handleError 우회). 그러나 "<i>API 계층의 일관성 위반</i>"으로 통합 지적하지 못함.</td>
+    </tr>
+    <tr class="row-summary">
+      <td colspan="3">소계</td>
+      <td colspan="2">✅ 9 · ⚠️ 2 · ❌ 1 → 매칭 11/12</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<!-- 3. B. 런타임(3) -->
+<h2>3. B. 런타임 트랩 (3) — 매칭 표</h2>
+<div class="panel">
+<table>
+  <thead>
+    <tr>
+      <th style="width:40px;">#</th>
+      <th style="width:60px;">축</th>
+      <th>트랩 요약</th>
+      <th style="width:80px;">매칭</th>
+      <th>내 리포트 대응</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>13</td><td><span class="axis">FE</span></td>
+      <td>"7일 연장" 버튼이 3일만 — 라벨/동작 불일치.</td>
+      <td><span class="badge full">✅완전</span></td>
+      <td>본문 #10 (TEST-6 + UNPLANNED-SEC-1 + UNPLANNED-PERF-2, <b>3리뷰어 독립 발견</b>). 회귀 가드 테스트 코드까지 제시.</td>
+    </tr>
+    <tr>
+      <td>14</td><td><span class="axis">BE</span></td>
+      <td><code>extra_days</code> 음수 검증 없음 — due_at 과거화.</td>
+      <td><span class="badge full">✅완전</span></td>
+      <td>본문 #7 (SEC-3 + TEST-2). <code>Field(ge=1, le=14)</code> 수정안 + 음수/0/경계 테스트 7건 제시.</td>
+    </tr>
+    <tr>
+      <td>15</td><td><span class="axis">FE</span></td>
+      <td>"활성 대여 없음" 메시지가 *전체 rentals 기준* — 반납 완료 있으면 안 보임.</td>
+      <td><span class="badge miss">❌미발견</span></td>
+      <td>ReturnExtend 컴포넌트 테스트 0건이라는 *상위 메타*는 잡았으나 빈 상태 필터링 버그는 인지 못함. <b>MANUAL-1~5에 "활성 없음 메시지 시나리오" 자체는 적었으나 그게 *버그*임은 모름</b>.</td>
+    </tr>
+    <tr class="row-summary">
+      <td colspan="3">소계</td>
+      <td colspan="2">✅ 2 · ❌ 1 → 매칭 2/3</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<!-- 4. C. Playwright(3) -->
+<h2>4. C. Playwright 전용 발견 (3) — 매칭 표</h2>
+<div class="panel">
+<table>
+  <thead>
+    <tr>
+      <th style="width:60px;">#</th>
+      <th>트랩 요약</th>
+      <th style="width:80px;">매칭</th>
+      <th>내 리포트 대응 / 누락 이유</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>P1</td>
+      <td><code>key={index}</code>로 인한 React 매칭 꼬임 (입력값 보존 안 됨).</td>
+      <td><span class="badge part">⚠️부분</span></td>
+      <td>PERF-3에서 "<i>정렬 시 N개 DOM 노드 재페인트 + 가시적 깜빡임</i>"으로 잠재 버그까지 인지. 그러나 *입력값 보존 안 됨/잘못된 컴포넌트 매칭*이라는 React 특유의 증상은 지적 못함. <b>이유</b>: 코드 리뷰로는 *경고*만 가능, 실제 증상은 Playwright 필요.</td>
+    </tr>
+    <tr>
+      <td>P2</td>
+      <td>XSS 실제 실행 검증 (asset 이름에 페이로드 주입 + window.__pwn 확인).</td>
+      <td><span class="badge miss">❌미발견</span></td>
+      <td>SEC-4가 XSS *취약점*은 잡았고 COMBO-1에서 *공격 시나리오*까지 기술. 그러나 "Playwright로 실제 실행 검증"이라는 검증 방법론은 제안 안 함. <b>이유</b>: 보안 에이전트가 *이론*에 머무름 — 실제 검증을 위한 도구 권한(Playwright MCP)을 검사 영역에 포함 안 시킴.</td>
+    </tr>
+    <tr>
+      <td>P3</td>
+      <td>접근성 (axe-core: aria-label, label 미연결, contrast).</td>
+      <td><span class="badge miss">❌미발견</span></td>
+      <td>4개 에이전트 모두 a11y 축 자체가 없음. <b>이유</b>: 자작 3개 에이전트가 성능/테스트/아키에 집중 — *a11y-guardian* 같은 도메인 특화 에이전트 부재. 다음 라운드 보강 후보.</td>
+    </tr>
+    <tr class="row-summary">
+      <td colspan="2">소계</td>
+      <td colspan="2">⚠️ 1 · ❌ 2 → 매칭 1/3 (가장 약한 축)</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<!-- 5. D. 비계획(8) -->
+<h2>5. D. 비계획 발견 baseline (8) — 매칭 표</h2>
+<div class="panel">
+<table>
+  <thead>
+    <tr>
+      <th style="width:60px;">#</th>
+      <th style="width:90px;">종류</th>
+      <th>트랩 요약</th>
+      <th style="width:80px;">매칭</th>
+      <th>내 리포트 대응 / 누락 이유</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>U1</td><td>deprecation</td>
+      <td>Pydantic <code>class Config:</code> 패턴 (v3 제거).</td>
+      <td><span class="badge full">✅완전</span></td>
+      <td>UNPLANNED-13 (ARCH UNPLANNED-ARCH-1). v2 표준 <code>model_config = ConfigDict(...)</code> 마이그레이션 제안.</td>
+    </tr>
+    <tr>
+      <td>U2</td><td>보안 구성</td>
+      <td>CORS <code>allow_methods=["*"]</code> + <code>allow_credentials=True</code>.</td>
+      <td><span class="badge miss">❌미발견</span></td>
+      <td>Security가 CORS는 봤으나 "<i>현재 dev: localhost:5173만 허용 — 적정</i>"으로 평가하며 *methods 와일드카드 + credentials 조합*의 위험성은 지적 못함. <b>이유</b>: <code>main.py</code>를 Read 했으나 중간에 끊김. 보안 에이전트 검사 영역 P6에 "와일드카드"는 있으나 *조합 패턴*은 명세 부족.</td>
+    </tr>
+    <tr>
+      <td>U3</td><td>환경 설정</td>
+      <td><code>BASE = 'http://localhost:8000'</code> 하드코딩.</td>
+      <td><span class="badge part">⚠️부분</span></td>
+      <td>PERF-2에서 "ReturnExtend가 <code>BASE</code>를 페이지에서 재선언 — handleError 우회로 일관성 깨짐"으로 *재선언*은 잡음. 그러나 *환경설정 미분리(env var)*로서의 하드코딩 자체는 별도 지적 없음.</td>
+    </tr>
+    <tr>
+      <td>U4</td><td>인증 표시</td>
+      <td>가짜 인증이 *프로덕션 코드처럼* 작성 (주석/경고 없음).</td>
+      <td><span class="badge miss">❌미발견</span></td>
+      <td>SEC-1/SEC-5에서 "X-User-Id가 가짜 인증의 유일 자격증명"임을 *결과적으로* 활용하지만 <code>auth.py</code>가 *경고 주석 없이* 작성된 것 자체는 못 잡음. <b>이유</b>: 보안 에이전트가 결함을 찾는 데 집중 — *코드의 의도/문서화 부족*은 검사 영역 밖.</td>
+    </tr>
+    <tr>
+      <td>U5</td><td>하드코딩</td>
+      <td><code>DEFAULT_RENTAL_DAYS = 7</code> 외부 설정 부재.</td>
+      <td><span class="badge part">⚠️부분</span></td>
+      <td>UNPLANNED-14에서 "기본 7 = DEFAULT_RENTAL_DAYS 7 우연 충돌"로 *상수 존재*는 인지. #20에서 "<code>MAX_EXTEND_DAYS</code> 등 도메인 상수를 <code>app/config.py</code>로 이전"으로 *외부화 권고*는 함. 그러나 두 발견이 *통합되지 않음*.</td>
+    </tr>
+    <tr>
+      <td>U6</td><td>UX</td>
+      <td>에러 detail이 영어 코드 그대로 (<code>asset_not_found</code> 등).</td>
+      <td><span class="badge miss">❌미발견</span></td>
+      <td>MANUAL-4에서 "연장 한도 도달 후 UX: '연장 실패'만 보여줌. 어떤 실패인지 안 알려준다"는 *유사 영역*은 언급. 그러나 *백엔드 detail이 한국어가 아니라 영어 enum*이라는 *국제화/UX 어법* 측면은 못 잡음. <b>이유</b>: UX 전문 에이전트 부재 — performance가 라벨↔동작 정합성은 보지만 *문구 품질*까지는 안 봄.</td>
+    </tr>
+    <tr>
+      <td>U7</td><td>운영</td>
+      <td><code>/healthz</code> 엔드포인트 부재.</td>
+      <td><span class="badge miss">❌미발견</span></td>
+      <td>4개 에이전트 모두 *운영 가능성(operability)* 축 부재. <b>이유</b>: architecture-guardian이 §1~§6은 보지만 *운영 인프라(health check, metrics, graceful shutdown)*는 ARCHITECTURE.md 자체에 없어서 회피. 다음 라운드에 *ops-reviewer* 추가 후보.</td>
+    </tr>
+    <tr>
+      <td>U8</td><td>자동 셋팅</td>
+      <td><code>main.tsx</code>에 <code>localStorage.userId = 'alice'</code> 영구 박힘.</td>
+      <td><span class="badge miss">❌미발견</span></td>
+      <td>UNPLANNED-9에서 <code>setup.ts</code>의 <code>'test-user'</code> 강제는 잡았으나 *프로덕션 진입점 <code>main.tsx</code>의 'alice' 영구*는 못 잡음. <b>이유</b>: <code>main.tsx</code>가 diff에 포함되지 않아 에이전트가 직접 Read 안 함 — *위험 구역 자동 확장* 규칙이 "프론트 진입점도 항상 확인"을 포함하지 않음.</td>
+    </tr>
+    <tr class="row-summary">
+      <td colspan="3">소계</td>
+      <td colspan="2">✅ 1 · ⚠️ 2 · ❌ 5 → 매칭 3/8 (가장 약한 baseline)</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<!-- 6. TRAP에 없는 추가 발견 -->
+<h2>6. 🎁 TRAP에 없는 추가 발견 (+8 보너스)</h2>
+<div class="dashed">
+호스트가 박지 않은 진짜 결함을 *자연 발견*한 항목. 에이전트 깊이의 지표.
+
+<ul>
+  <li><b>신구 패턴 혼재 (#12 ARCH-10)</b> — 같은 파일 내 Service 위임 vs Router 직접 ORM 공존. 다음 신규 라우터의 결함 패턴 락인 위험. <i>아키텍처 깊이</i>.</li>
+  <li><b><code>extended_days</code>의 <code>.days</code> 절삭 off-by-one (#11)</b> — TRAP #7(비즈니스 로직 라우터)을 *세부 분/초 단위 함정*까지 추적.</li>
+  <li><b>ReturnExtend 프론트 N+1 워터폴 (#9)</b> — TRAP #3은 백엔드 N+1, 이건 별도 프론트 측면. 11 요청/사용자 3건 연장 시 33 호출 정량 추정.</li>
+  <li><b>가용성 백엔드 AND vs 프론트 OR (COMBO-3)</b> — 같은 자산이 화면별로 다르게 표시되는 정합성 결함. §2의 클라이언트 거울상.</li>
+  <li><b>응답 body에 <code>user_id</code> 그대로 (UNPLANNED-5)</b> — rental_id → user_id enumeration 자료. SEC-1과 결합 시 자동화 가능.</li>
+  <li><b>입력 검증 정책 미정 400 vs 422 (UNPLANNED-10)</b> — Pydantic 제약 추가 시 응답 코드 정책 부재. 테스트가 어느 쪽을 기대해야 할지 명세 부재.</li>
+  <li><b>pytest-xdist 격리 (UNPLANNED-11)</b> — <code>app.dependency_overrides</code> 모듈 전역 → 병렬 테스트 격리 깨짐. 동시성 테스트 추가 시 함정.</li>
+  <li><b><code>asset_type</code> 마스터 리스트 FE 하드코딩 (UNPLANNED-15)</b> — 도메인 enum이 BE에 없고 FE 상수로만 존재. §2 정신의 또 다른 거울상 위반.</li>
+</ul>
+</div>
+
+<!-- 7. 결합 시나리오 -->
+<h2>7. 🔗 결합 시나리오 (5)</h2>
+<div class="pink">
+단독 평가의 *합*이 아니라 *시너지*. 본 합의 리포트가 명시한 결합 5개:
+
+<ul>
+  <li><b>COMBO-1 — 권한 우회 자동화 (Critical)</b>: XSS(#4) + 권한 누락(#1) + 콘솔 누설(SEC-5) → 모든 사용자 ReturnExtend 진입 시 XSS 실행 → userId 탈취 → rental_id enumeration으로 타인 대여 무차별 반납.</li>
+  <li><b>COMBO-2 — 상태 영구 불일치 (High)</b>: 이중 상태(#2) + 트랜잭션 Router(#6) + 동시성 락 부재 → Postgres 이전 직후 returned_at 덮어쓰기 + asset.status 부분 커밋.</li>
+  <li><b>COMBO-3 — 가용성 정합성 깨짐 (High)</b>: PERF-4 클라이언트 재계산 + 백엔드 AND vs 프론트 OR + §2 거울상 → 같은 자산이 AssetList(가용) vs MyRentals(불가용) 다르게 표시.</li>
+  <li><b>COMBO-4 — 동시 음수 연장 (High)</b>: <code>extra_days</code> 검증 부재(#7) + 동시성 락 부재 → 음수 + 양수 동시 호출로 누적 검증 우회 → 한도 14일 우회 무한 연장.</li>
+  <li><b>COMBO-5 — userId 외부 유출 (Medium→High)</b>: handleError 로깅(SEC-5) + 응답에 user_id(UNPLANNED-5) + 매 실패 객체 빌드(PERF-5) → Sentry/스크린샷 외부 채널로 매핑 자료 유출.</li>
+</ul>
+</div>
+
+<!-- 8. 합의 종합 품질 -->
+<h2>8. ✅ 합의 종합 품질 7항목 체크</h2>
+<div class="panel">
+  <div class="check"><span class="mark">✓</span><div><b>중복 병합 흔적</b> — 11개 항목에 공동 발견자 명시 (#1·#3는 3리뷰어, #2·#5·#7·#8·#10·#13은 2~3리뷰어).</div></div>
+  <div class="check"><span class="mark">✓</span><div><b>충돌 해결 기록</b> — 4건 표로 정리 (handleError 보안 우선, return 권한 수정 방식, 가용성 단일 진실, 테스트 vs 속도).</div></div>
+  <div class="check"><span class="mark">✓</span><div><b>모든 이슈에 Blocking/Non-blocking 라벨</b> — 24개 항목 전부.</div></div>
+  <div class="check"><span class="mark">✓</span><div><b>Executive Summary "한 줄 위험 요약"</b> — 최상단 인용 박스 ("권한 누락 enumeration + XSS로 userId 탈취 시 자동화되는 대량 데이터 조작").</div></div>
+  <div class="check"><span class="mark">✓</span><div><b>결합 시나리오 1개 이상</b> — 5개 (Combined Risks 섹션).</div></div>
+  <div class="check"><span class="mark">✓</span><div><b>비계획 발견 별도 섹션</b> — 16개 + 호스트 통계용 요약.</div></div>
+  <div class="check"><span class="mark">✓</span><div><b>Confidence 라벨</b> — 모든 본문 발견에 High/Medium/Low 명시.</div></div>
+  <div style="margin-top: 12px; color: #4ade80; font-weight: 600;">→ 7 / 7 모두 충족.</div>
+</div>
+
+<!-- 9. 강점 / 약점 / 다음 라운드 -->
+<h2>9. 📈 강점 / 약점 / 다음 라운드 개선</h2>
+
+<div class="panel">
+  <h3 style="color:#4ade80;">강점</h3>
+  <ul>
+    <li><b>결합 시나리오 5개</b> — 단독 결함을 *시너지*로 재평가. COMBO-1은 4리뷰어 발견을 묶어 Critical 잔류 판정.</li>
+    <li><b>"공통 근본 원인" 통찰</b> — 백엔드 결함 다수가 *Service 우회 결정 1건*의 결과라는 아키텍처 차원의 메타 발견. 수정 우선순위 자동 정렬.</li>
+    <li><b>3리뷰어 독립 중복 (#1, #10)</b> — 같은 결함을 다른 축에서 다르게 본다는 합의 패턴의 *교과서적 사례*. "7일 = 3일" 버튼은 보안(라벨 신뢰)·성능(재시도 부하)·테스트(회귀 가드)에서 각각 잡힘.</li>
+    <li><b>영향 추정 정량화</b> — N+1을 "자산 200개 시 60ms" 식으로 *측정 가능한 단위*로 환산. 머지 판단에 직결.</li>
+    <li><b>회귀 가드 코드 제시</b> — 추측이 아니라 *복붙 가능한 pytest/vitest 케이스* 8건 이상 첨부.</li>
+  </ul>
+</div>
+
+<div class="panel">
+  <h3 style="color:#f87171;">약점</h3>
+  <ul>
+    <li><b>Playwright 실행 검증 부재 (C 1/3)</b> — SEC-4가 XSS *취약점*은 잡지만 *실제 실행 검증 방법론*은 제안 안 함. 보안 리뷰가 이론 수준에 머무름.</li>
+    <li><b>운영/구성 baseline 약함 (D 3/8)</b> — CORS 조합 패턴, /healthz 부재, 가짜 인증 표시 부재 등 *코드 외 결정*을 못 잡음. ARCHITECTURE.md에 없는 영역.</li>
+    <li><b>접근성(a11y) 축 0</b> — axe-core 도메인 에이전트 부재. UX 영역에서 한국어 에러 문구도 놓침 (U6).</li>
+    <li><b>diff 외 진입점 미확인</b> — <code>main.tsx</code>의 'alice' 영구가 diff에 없어서 못 봄 (U8). *위험 구역 자동 확장* 규칙에 "FE 진입점도 항상 Read"가 없음.</li>
+    <li><b>overdue 정책 부재 인지 실패 (#6)</b> — 정책이 *없는 것 자체*를 결함으로 보지 못함. "있어야 할 것이 없다" 검사 기준 부재.</li>
+  </ul>
+</div>
+
+<div class="panel">
+  <h3 style="color:#6ea8fe;">다음 라운드 개선 (에이전트 진화 후보)</h3>
+  <ul>
+    <li><b>+ <code>ops-reviewer</code></b> — health check, graceful shutdown, env var, CORS 조합 패턴, 가짜 인증 표시. ARCHITECTURE.md를 *운영* 절(§7)로 확장.</li>
+    <li><b>+ <code>a11y-guardian</code></b> — axe-core 카테고리(aria, label, contrast, semantic, heading). Playwright MCP 보유 시 자동 분석.</li>
+    <li><b><code>security-reviewer</code> 강화</b> — 검사 영역에 *실제 검증 방법론* 추가 ("XSS 발견 시 Playwright 페이로드 시나리오 1개 첨부").</li>
+    <li><b><code>test-coverage-reviewer</code> 강화</b> — 매트릭스 동시성 칸이 ✗일 때 *threading/asyncio 기반 테스트 코드 스니펫* 자동 제안 의무화.</li>
+    <li><b>위험 구역 자동 확장 규칙 추가</b> — "FE 변경 시 <code>main.tsx</code> + <code>App.tsx</code> + <code>vite.config.ts</code> 무조건 Read", "BE 변경 시 <code>main.py</code> + <code>auth.py</code> + <code>config.py</code> 무조건 Read".</li>
+    <li><b>"있어야 할 것이 없다" 체크리스트</b> — overdue 정책 / pagination / rate limit / audit log 같은 *부재 결함* 별도 검사.</li>
+  </ul>
+</div>
+
+<div class="footer">
+  생성: 2026-05-28 · 합의 종합자 정량 채점 · 호스트 채점표는 <code>.gitignore</code> 처리되어 commit 대상 아님.
+</div>
+
+</body>
+</html>
